@@ -1,0 +1,8 @@
+{
+  "tag": "v1.4",
+  "assets": {
+    "Houston.dmg": "3b28e422924e31e53fcebfbdd347929bdd38f98d5881f5e235a1a9efbb3ab093",
+    "Houston-Source.zip": "e493b3c29d94870a9b88779c07b1c5187e3e4e376fd0001b2aab5d0a9ecbeae3"
+  },
+  "notes": "Houston 1.4 \u2014 native macOS system monitoring, now with Sparkle updates.\n\n- Added Check for Updates and native Updates settings: daily/weekly checks and optional automatic downloads/installation.\n- Uses the public release feed; no GitHub token or account is required.\n- Removed Open Activity Monitor from Performance and the bottom window status strip.\n- Added an AI-usage disclosure to About Houston and source documentation.\n- Preserved GPL-3.0-or-later licensing and complete upstream notices for Mission Center, graph-widget, Stats and Sparkle.\n\nInstallation: open Houston.dmg and drag Houston to Applications. Requires Apple silicon and macOS 26 or later. This development build is ad-hoc signed and is not Developer ID notarized. Sparkle updates are signed separately with Ed25519.\n\nCorresponding source: Houston-Source.zip is included both as a release asset and inside the DMG. Supply it and the licenses when redistributing the app. Houston is GPL-3.0-or-later and provided without warranty.\n\nAI disclosure: substantial OpenAI Codex assistance was used for code, design, debugging, tests, packaging and documentation. No endorsement or accuracy guarantee is implied.\n\nCredits: [Mission Center](https://gitlab.com/mission-center-devs/mission-center), [graph-widget](https://gitlab.com/mission-center-devs/graph-widget), [Stats](https://github.com/exelban/stats), and [Sparkle](https://github.com/sparkle-project/Sparkle). Full copyright and license notices accompany the app and source.\n"
+}
