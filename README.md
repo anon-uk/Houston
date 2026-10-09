@@ -4,6 +4,10 @@ A native SwiftUI/AppKit system monitor for Apple silicon, macOS 26 or later.
 Version 1.4. It follows the modern Windows Task Manager workflow and adapts
 Mission Center UI resources into native Mac views with Liquid Glass.
 
+![Houston Performance view with logical CPU graphs and resource summaries](docs/images/houston-performance.jpg)
+
+*Houston’s native Performance view. The navigation sidebar is hidden to keep personal details out of the screenshot.*
+
 ## Run
 
 Open `Houston.dmg` and drag `Houston.app` to Applications. The DMG
