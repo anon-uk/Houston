@@ -1,0 +1,49 @@
+# Houston 1.3 validation — 9 October 2026
+
+Implemented native SwiftUI sidebar alignment and consistent spacing; Settings is available through the application menu and Command-comma. Added a standard AppKit About panel with version, local-data description, credits, and license links. App display name, executable, and distribution are Houston; the existing bundle identifier preserves preferences.
+
+Toolbar background now explicitly uses the same semantic window background as the content. Native glass controls remain. Removed inherited page animation from the split view and disabled animation on sidebar selection, so its symbols are not part of a fading transition. Numeric readings and text have no custom content animation. Disclosure and graph animations respect Reduce Motion.
+
+Optional CPU, memory, GPU, disk, and network gadgets now use AppKit NSStatusItem buttons, with an image-leading title for values. Updates reuse buttons and symbols, change titles only when necessary, and coalesce monitor publications. Popovers retain the native SwiftUI live graph and controls. Existing gadget preferences are preserved. Menu-bar icon/value rendering and anchored popover interaction could not be directly observed through the available window-only UI capture; those remain runtime verification limits.
+
+Observed main Processes and Performance screens, aligned and evenly spaced sidebar symbols, successful sidebar selection, and matching toolbar/content background in Dark appearance. Observed native Settings and standard About panel. Did not exhaustively verify Light appearance, VoiceOver, or Reduce Transparency.
+
+Efficiency changes: miniature graphs update only with samples; large scrolling plots request at most 30 fps. Process grouping is recomputed only when identities/parentage change, account names are cached, CPU normalization is read once per sample, and sampling timers allow coalescing. Collection runs at utility priority and does not overlap.
+
+Short CPU measurements using proc_pid_rusage over 15 seconds: 0.43% of one core during monitoring with Settings open, resident 312.6 MB; 1.00% with the logical-processor Performance view selected, resident 297.2 MB. Window focus/occlusion may affect these observations; they are not a battery-life benchmark or guaranteed foreground maximum. Profiling identified repeated string matching in process grouping before caching.
+
+Metrics checks passed PID/UID/RSS/thread readings and CPU nanosecond units against getrusage. Graph checks passed boundary coverage at 1/2/4-second refresh, interpolation, startup history, and logical processor grids. Optimized build compiled, ad-hoc signature verified, ZIP extracted and signature reverified. This is not a notarized distribution.
+
+API reference: https://developer.apple.com/documentation/appkit/nsstatusitem
+
+Follow-up: status items now reserve compact fixed widths (64 points for percentages, 82 for transfer rates, 28 for icon-only mode), avoiding layout changes when values change. Transfer-rate menu-bar labels omit spaces; full readings remain in tooltips/popovers. Toolbar and surrounding content use matching native regular material. A native window bridge enables background dragging while controls keep their interactions. Compiled and signature-verified; menu-bar spacing and drag coverage are not fully observed with the window-only capture tools.
+
+Process-layout review: replaced rigid process columns with width bounds that respond to available space. Name grows in wider views and uses middle truncation plus a full-name tooltip. Name, CPU, Memory, and Disk remain visible in compact windows; PID, Status, and User return at increasing widths. Secondary metadata remains available through Inspect and Details. Table typography uses the system body style with native inset alternating rows and selection; colored per-resource blocks were removed. Page actions moved to the system toolbar. Window Size commands provide Compact/Standard/Wide presets.
+
+Observed a 780-point Compact window with all four main columns readable and no horizontal scroll. Observed secondary columns returning after choosing Wide, and a final wide layout with longer process names, all seven columns, readable values, and native inset rows. Metric and graph tests passed; final presentation build and extracted ZIP signatures verified. Light appearance and assistive-technology behavior were not exhaustively rechecked. Design references: https://developer.apple.com/design/human-interface-guidelines/lists-and-tables and https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/ . These changes improve the process and toolbar presentation; they are not a claim of exhaustive HIG conformance.
+
+Messages/Activity Monitor reference pass: native sidebar search is now a sticky header in the wider navigation pane; the forced toolbar blur/background was removed and the native unified toolbar integrates with the panes. The content area uses the semantic window background instead of a broad material overlay. Performance headings use restrained system title sizing. The latest Processes window was observed with sidebar search, integrated chrome, inset rows, aligned actions, and a quiet content surface.
+
+Gadget overflow correction: each status button now contains a fixed-size template image that draws the symbol and reading within explicit bounds. Menu labels use a bounded decimal bytes-per-second format without thousands separators, while popovers/tooltips retain full readings. Width derives from the widest native-font label across all supported unit suffixes; image dimensions do not change with samples. Font-width assertions cover a sweep of rates and unit transitions, including unavailable/very large values. This verifies sizing and avoids title-layout overflow; the global menu bar itself remains outside the tool's window-only captures. Compact layout with the newly widened sidebar and Light appearance were not exhaustively rechecked in this pass.
+
+Background monitoring: observed the General setting enabled, closed the main window, and observed the GPU gadget remain live with changing readings (40% then 22%). Its Open Houston button successfully restored the main Performance window. Disabling the setting requests termination after the final window closes; Dock reopening uses the application delegate. Those two paths were compiled but not directly exercised in this pass.
+
+Spacing correction: enabled gadgets now share one NSStatusItem with individual borderless native buttons, eliminating inter-item system margins. Internal gap is two points, and each reading retains its fixed native-font slot and bounded drawing.
+
+Compact strip rate labels use B/K/M/G/T/P/E suffixes with a five-character bound, reducing reserved rate whitespace; full byte-per-second units remain in tooltips and popovers. Each gadget remains individually accessible and clickable.
+
+Unified gadget revision: replaced separate embedded buttons and per-metric popovers with one template-image NSStatusBarButton and one shared native popover. Selected CPU, memory, GPU, disk, and network readings have labeled graphs and details in a scrollable panel, plus shared Open Houston, pause/resume, and Settings controls. Fixed native-font slots remain. Build, metric, graph, and label-boundary tests passed.
+
+Observed the unified popover with all five labeled readings, graphs, and transfer details. Verified pause/resume changes the panel to Live and values continue updating; accessibility scrolling reaches the full Network graph and receive/send details. Reduced graph height and vertical spacing after observation to show more of the combined summary at once. Global menu-bar image remains outside window capture.
+
+Final compact panel observed: all five graphs and detail lines fit without a scroll bar at the captured size. Resumed monitoring and left the unified panel live.
+
+Gadget refinement: content height now follows measured statistics content, removing the fixed empty area above the footer. The temporary borderless line-only graph experiment was reverted after user feedback; filled graphs and outlines are restored.
+
+Latest gadget redesign observed: five compact summary rows with explicit readings/details at left and miniature filled graphs at right. Measured content height removes blank footer space. Miniature plots suppress hover cursors and tooltip overlays and redraw on samples. Menu symbols now preserve aspect ratio; tooltip is a concise action label, while accessibility retains all readings. Observed all five rows and footer controls together and live values updating. Native menu-bar image changes remain unobserved through window capture. Build/signature and metric/graph/label tests passed.
+
+Native detachment: NSPopoverDelegate permits detachment into AppKit’s standard detached window, with a Houston Statistics title and close control. The detached window floats, permits background dragging, and registers a frame autosave name. Observed the detached title/close control, performed a title drag, and observed continued live readings. Screen coordinates and position restoration across relaunch were not measured. Build and extracted signature verified.
+
+Removed redundant Houston Statistics controller/window title from the detached gadget. Confirmed fresh launch shows Live and the opened gadget remains Live without pausing during verification. Pause defaults false and is not persisted. Build and extracted signatures verified.
+
+Detached header alignment: use AppKit’s native Houston title with its native close control, and hide the custom Houston header after detachment. Live/Paused moves to the footer while detached. This removes manual alignment against the close control. Built/signature verified and fresh startup/gadget observed Live. Native drag recheck was blocked by CUA windowNotFoundAtPosition, so the final detached alignment was not captured.
