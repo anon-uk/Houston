@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Modified for Houston, 2026-10-09; see THIRD-PARTY-NOTICES.md.
 import Foundation
 
 // Menu-bar labels have a bounded length, without grouping separators.

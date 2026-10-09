@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Native adaptations modified for Houston, 2026-10-09. See THIRD-PARTY-NOTICES.md and AI_DISCLOSURE.md.
 import SwiftUI
 import AppKit
 import Charts
@@ -787,11 +789,12 @@ struct Reading:View {
 }
 @MainActor func showAbout() {
     let info=Bundle.main.infoDictionary ?? [:]
-    let credits=NSMutableAttributedString(string:"Mission control for your Mac.\n\nLive processes, performance graphs, and optional menu-bar monitors. Readings and recorded history stay on this Mac.\n\nOpen-source credits\nMission Center UI reference — GPL-3.0-or-later\nStats monitoring reference — MIT\n\n",attributes:[.font:NSFont.systemFont(ofSize:12),.foregroundColor:NSColor.labelColor])
-    for (name,address) in [("Mission Center","https://gitlab.com/mission-center-devs/mission-center"),("Stats","https://github.com/exelban/stats")] {
+    let credits=NSMutableAttributedString(string:"Mission control for your Mac.\n\nLive processes, performance graphs, and optional menu-bar monitors. Readings and recorded history stay on this Mac.\n\nHouston is free software under GPL-3.0-or-later, supplied without warranty. The complete license and corresponding source accompany each release.\n\nOpen-source credits\nMission Center UI reference — GPL-3.0-or-later\nStats monitoring reference — MIT\nSparkle updater — MIT (additional bundled notices)\n\nAI usage disclosure\nDeveloped with substantial assistance from OpenAI Codex for code, design, debugging, tests, and documentation. No endorsement or accuracy guarantee is implied.\n\n",attributes:[.font:NSFont.systemFont(ofSize:12),.foregroundColor:NSColor.labelColor])
+    for (name,address) in [("Mission Center","https://gitlab.com/mission-center-devs/mission-center"),("Stats","https://github.com/exelban/stats"),("Graph widget","https://gitlab.com/mission-center-devs/graph-widget"),("Sparkle","https://github.com/sparkle-project/Sparkle")] {
         credits.append(NSAttributedString(string:name+"\n",attributes:[.link:URL(string:address)!, .font:NSFont.systemFont(ofSize:12)]))
     }
     if let license=Bundle.main.url(forResource:"LICENSE",withExtension:nil) {credits.append(NSAttributedString(string:"License\n",attributes:[.link:license,.font:NSFont.systemFont(ofSize:12)]))}
+    for name in ["THIRD-PARTY-NOTICES.md", "AI_DISCLOSURE.md", "SPARKLE-LICENSE.txt"] { if let url=Bundle.main.url(forResource:name,withExtension:nil) {credits.append(NSAttributedString(string:name+"\n",attributes:[.link:url,.font:NSFont.systemFont(ofSize:12)]))} }
     NSApp.activate(ignoringOtherApps:true)
     NSApp.orderFrontStandardAboutPanel(options:[.applicationName:"Houston",.applicationVersion:info["CFBundleShortVersionString"] as? String ?? "1.3",.version:info["CFBundleVersion"] as? String ?? "4",.credits:credits])
 }
@@ -862,6 +865,7 @@ Toggle("Network",isOn:$menuNetwork)
                 }
                 Section("Credits") {Text("Houston is distributed under GPL-3.0-or-later. See About Houston for acknowledgements and the bundled license.").font(.caption).foregroundStyle(.secondary);Button("About Houston…") {showAbout()}}
             }.formStyle(.grouped).tabItem {Label("Data",systemImage:"externaldrive")}
+            UpdateSettings().tabItem {Label("Updates",systemImage:"arrow.down.circle")}
         }.padding(12)
     }
 }
@@ -1060,7 +1064,7 @@ struct Inspector: View {
     @AppStorage("menuNetwork") var menuNetwork=false
     @AppStorage("appearance") var appearance = "System"
     var body: some Scene {
-        Window("Houston", id:"main") { MainView().environmentObject(monitor).onAppear { delegate.reopenWindow={monitor.openMainWindow?()}; NSApp.setActivationPolicy(.regular);if let url=Bundle.main.url(forResource:"TaskManager",withExtension:"icns"),let icon=NSImage(contentsOf:url) {NSApp.applicationIconImage=icon}; NSApp.activate(ignoringOtherApps:true) } }.defaultSize(width:1250,height:790).windowToolbarStyle(.unified)
+        Window("Houston", id:"main") { MainView().environmentObject(monitor).onAppear { _ = HoustonUpdater.shared; delegate.reopenWindow={monitor.openMainWindow?()}; NSApp.setActivationPolicy(.regular);if let url=Bundle.main.url(forResource:"TaskManager",withExtension:"icns"),let icon=NSImage(contentsOf:url) {NSApp.applicationIconImage=icon}; NSApp.activate(ignoringOtherApps:true) } }.defaultSize(width:1250,height:790).windowToolbarStyle(.unified)
         .commands { TaskCommands(monitor:monitor) }
         Settings { SettingsContent().environmentObject(monitor).frame(width:620,height:600).preferredColorScheme(appearance == "System" ? nil : appearance == "Dark" ? .dark : .light) }
     }
@@ -1081,7 +1085,7 @@ struct TaskCommands: Commands {
                     Button("Wide") {resizeWindow(width:1400,height:850)}
                 }
             }
-            CommandGroup(replacing:.appInfo) {Button("About Houston") {showAbout()}}
+            CommandGroup(replacing:.appInfo) {Button("About Houston") {showAbout()};Button("Check for Updates…") {HoustonUpdater.shared.check()}}
             CommandGroup(after:.textEditing) { Button("Find…") {NotificationCenter.default.post(name:Notification.Name("TaskManagerFind"),object:nil)}.keyboardShortcut("f",modifiers:.command) }
             CommandGroup(after:.newItem) { Button("Run New Task…") { monitor.runTask() }.keyboardShortcut(KeyEquivalent("n"),modifiers:.command); Button("Export Process List…") { monitor.export() }.keyboardShortcut("e",modifiers:[.command,.shift]) }
             CommandMenu("Navigate") { ForEach(Page.allCases.filter {$0 != .settings}) { p in Button(p.rawValue) { monitor.page = p } }; Divider(); Toggle("Always on Top",isOn:$monitor.alwaysOnTop); Button(monitor.paused ? "Resume Updates" : "Pause Updates") { monitor.paused.toggle() }.keyboardShortcut("p",modifiers:[.command,.shift]); Button("Refresh Now") { monitor.refresh(); monitor.refreshServices() }.keyboardShortcut(KeyEquivalent("r"),modifiers:.command) }

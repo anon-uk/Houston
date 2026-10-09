@@ -1,19 +1,24 @@
 # Houston
 
 A native SwiftUI/AppKit system monitor for Apple silicon, macOS 26 or later.
-Version 1.3. It follows the modern Windows Task Manager workflow and adapts
+Version 1.4. It follows the modern Windows Task Manager workflow and adapts
 Mission Center UI resources into native Mac views with Liquid Glass.
 
 ## Run
 
-Extract `Houston-Mac.zip` and open `Houston.app`. You can move the app
-to Applications. This build is ad-hoc signed, not Developer ID notarized.
+Open `Houston.dmg` and drag `Houston.app` to Applications. The DMG
+also contains the matching source archive and license notices. This build is ad-hoc signed, not Developer ID notarized.
 
-## What changed in 1.3
+## What changed in 1.4
+
+- Sparkle 2.10.0 updater with signed updates, Check for Updates menu command, and an Updates pane.
+- DMG installer with corresponding source, full license notices, and AI disclosure.
+
+## Previous interface improvements
 
 - Monitor-only sidebar with aligned SF Symbols and consistent spacing. Settings lives in the Houston menu (Command-comma).
 - Native About Houston panel with app icon, build/version information, privacy summary, open-source credits, and license links.
-- Four Settings panes: General, Monitoring, Menu Bar, and Data.
+- Native Settings panes: General, Monitoring, Menu Bar, Data, and Updates.
 - Optional CPU, memory, GPU, disk, and network menu-bar gadgets with native AppKit icons and values, live graphs and quick controls. Enable each in Settings → Menu Bar.
 - Restrained disclosure and graph animations respect Reduce Motion. Text, numeric readings, and sidebar selection remain static.
 - Existing preferences and usage history are preserved across the rename.
@@ -134,3 +139,22 @@ The menu-bar summary is one gadget and one shared popover. Settings → Menu Bar
 The unified panel uses compact summary rows with readings and details beside small graphs. Miniature graphs omit hover overlays; full Performance graphs retain detailed hover readouts. Popover height follows its content, and menu-bar SF Symbols preserve their natural proportions.
 
 Drag the gadget header away from the menu bar to detach it as a floating window. It remains open until closed and keeps sampling. Clicking the menu-bar gadget brings an already detached window forward.
+
+
+## AI usage and upstream credits
+
+Houston was developed with substantial assistance from OpenAI Codex. See [AI_DISCLOSURE.md](AI_DISCLOSURE.md) for the full disclosure, also available in About Houston.
+
+Houston adapts UI/graph work from [Mission Center](https://gitlab.com/mission-center-devs/mission-center) and [graph-widget](https://gitlab.com/mission-center-devs/graph-widget) under GPL-3.0-or-later, and monitoring approaches from [Stats](https://github.com/exelban/stats) under MIT. [Sparkle](https://github.com/sparkle-project/Sparkle) provides the updater. Full upstream attribution and license terms are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), [LICENSE](LICENSE), and [SPARKLE-LICENSE.txt](SPARKLE-LICENSE.txt). These are bundled with the app. Houston is an independent adaptation; no upstream endorsement is implied.
+
+## Distribution and corresponding source
+
+Houston is distributed under GPL-3.0-or-later, without warranty. Every binary release includes `Houston-Source.zip` containing the corresponding editable source, build scripts, upstream references and notices. Supply that archive and license notices alongside the DMG when redistributing; Preserve upstream notices and identify your modifications. The official, unmodified Sparkle SDK is pinned by version and SHA-256 in `Scripts/setup-sparkle.sh`.
+
+## Updates
+
+Sparkle performs signed update checks, downloads, installation and relaunch. Settings → Updates offers manual checks, daily/weekly automatic checks, and optional automatic download/installation. Automatic checking is off initially. Updates are fetched from the public `anon-uk/Houston` repository. No account, token or private-repository settings are required. Update requests go to GitHub; system-profile submission is disabled.
+
+The maintainer signing key stays in the build Mac's Keychain under Sparkle account `Houston`. Only the public key is in source. Back up the private key securely outside this repository; future releases must be signed with the same key. Use `Scripts/release.sh` after building, upload the DMG and source archive to the release, then generate `appcast.xml` with the public GitHub release download URL. Commit the feed after uploading the asset.
+
+The publishing workflow accepts locally built and Sparkle-signed artifacts in `release-inputs/`, verifies the manifest SHA-256 checksums, then uploads the DMG, exact source archive and checksums as a GitHub release. No signing private key or personal access token is stored in Actions. Future releases must be built and signed locally before updating the manifest.

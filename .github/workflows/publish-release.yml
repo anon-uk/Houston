@@ -1,0 +1,51 @@
+name: Publish signed Houston release
+on:
+  push:
+    branches: [main]
+    paths: ['release-inputs/manifest.json']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: houston-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve verified release inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          BASE="https://raw.githubusercontent.com/$GH_REPO/$RELEASE_COMMIT/release-inputs"
+          curl --fail --location "$BASE/manifest.json" -o manifest.json
+          python3 - <<'PY'
+          import json, re
+          m = json.load(open('manifest.json'))
+          assert re.fullmatch(r'v[0-9]+\.[0-9]+(?:\.[0-9]+)?', m['tag'])
+          assert set(m['assets']) == {'Houston.dmg', 'Houston-Source.zip'}
+          for name, digest in m['assets'].items():
+              assert re.fullmatch(r'[a-f0-9]{64}', digest)
+          PY
+          curl --fail --location "$BASE/Houston.dmg" -o Houston.dmg
+          curl --fail --location "$BASE/Houston-Source.zip" -o Houston-Source.zip
+          python3 - <<'PY'
+          import json, hashlib
+          m = json.load(open('manifest.json'))
+          with open('SHA256SUMS.txt', 'w') as sums:
+              for name, expected in m['assets'].items():
+                  actual = hashlib.sha256(open(name, 'rb').read()).hexdigest()
+                  assert actual == expected, name + ' checksum mismatch'
+                  sums.write(actual + '  ' + name + '\n')
+          open('release-notes.md', 'w').write(m['notes'])
+          PY
+          TAG=$(python3 -c 'import json; print(json.load(open("manifest.json"))["tag"])')
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" Houston.dmg Houston-Source.zip SHA256SUMS.txt --clobber
+          else
+            gh release create "$TAG" Houston.dmg Houston-Source.zip SHA256SUMS.txt --draft --target "$RELEASE_COMMIT" --title "Houston ${TAG#v}" --notes-file release-notes.md
+          fi
+          gh release edit "$TAG" --draft=false --latest --notes-file release-notes.md

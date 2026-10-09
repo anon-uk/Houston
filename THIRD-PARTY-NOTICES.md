@@ -43,3 +43,15 @@ Copyright 2026 Mission Center Developers
 The grid sizing, rounded graph frame, optional cubic smoothing, scrolling
 behavior, and dashed kernel series were adapted into SwiftUI Canvas from
 src/widget.rs and src/render.rs. No GTK or Rust runtime is included.
+
+Sparkle 2.10.0 updater
+https://github.com/sparkle-project/Sparkle
+The official Sparkle framework is bundled without source modifications.
+Its complete license and dependency notices are retained in SPARKLE-LICENSE.txt
+and in Sparkle.framework.
+
+Houston modifications
+Native SwiftUI/AppKit adaptations and integration were modified for Houston
+on 2026-10-09, with substantial AI assistance; see AI_DISCLOSURE.md.
+Houston as a whole is licensed under GPL-3.0-or-later. Upstream notices and
+licenses remain applicable to their respective components.
