@@ -93,11 +93,15 @@ From this source folder:
 
 ```sh
 mkdir -p /tmp/taskmanager-tests
+xcrun clang -std=c11 Tests/CPUDeltaTests.c -o /tmp/taskmanager-tests/cpudelta
+/tmp/taskmanager-tests/cpudelta
 xcrun clang -O2 Tests/MetricsTests.c Native/Metrics.c -o /tmp/taskmanager-tests/metrics
 /tmp/taskmanager-tests/metrics
 xcrun swiftc -parse-as-library Sources/GraphGeometry.swift Tests/GraphTests.swift -o /tmp/taskmanager-tests/graphs
 /tmp/taskmanager-tests/graphs
 ```
+
+`./Scripts/test.sh` runs all of these. The CPU tick-delta, graph and process-grouping tests are portable and also run on Linux in CI.
 
 Metrics tests compare CPU time against getrusage, and validate PID, ownership,
 resident memory, threads, total CPU/kernel counters, and individual core
@@ -120,7 +124,7 @@ The app source and Mission Center UI adaptations are GPL-3.0-or-later.
 Stats-derived monitoring approaches retain the MIT notice. See `LICENSE`
 and `THIRD-PARTY-NOTICES.md` for the respective copyrights and terms.
 
-App rows expand into descendants and helpers located within their app bundle. Parent rows sum CPU, resident memory, threads, and disk throughput. Shared pages may be counted more than once. Shared XPC helpers without a surviving parent relationship or app-specific executable path remain separate rather than guessed.
+App rows expand into descendants, processes macOS attributes to the app (its responsible process, which covers WebKit and XPC services launched by launchd), and helpers within the app’s innermost bundle, so an app nested in another app’s bundle keeps its own helpers. Parent rows sum CPU, resident memory, threads, and disk throughput. Shared pages may be counted more than once. Shared XPC helpers without a surviving parent relationship or app-specific executable path remain separate rather than guessed.
 
 Graph hover displays the nearest recorded sample, its timestamp, and values for both series. Sampling supports 0.5/1/2/4 seconds; graph scrolling renders up to 60 fps. Network totals use 64-bit route counters for Ethernet/Wi-Fi interfaces, excluding VPN/tunnel duplicate traffic. Memory uses the Stats formula including inactive/speculative pages and subtracting purgeable/file-backed pages.
 

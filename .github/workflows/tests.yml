@@ -1,0 +1,24 @@
+name: Portable tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  portable-c:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: CPU tick delta tests
+        run: |
+          cc -std=c11 -Wall -Wextra -pedantic -Werror -O2 Tests/CPUDeltaTests.c -o cpudelta -lm
+          ./cpudelta
+  portable-swift:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Graph geometry and process grouping tests
+        run: |
+          swiftc -parse-as-library Sources/GraphGeometry.swift Tests/GraphTests.swift -o graphs && ./graphs
+          swiftc -parse-as-library Sources/ProcessGrouping.swift Tests/GroupingTests.swift -o grouping && ./grouping
