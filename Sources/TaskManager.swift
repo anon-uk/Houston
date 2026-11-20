@@ -167,7 +167,10 @@ enum Page: String, CaseIterable, Identifiable {
     let historyURL: URL
     init() {
         historyURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("NativeTaskManager/history.json")
-        if let data = try? Data(contentsOf: historyURL), let rows = try? JSONDecoder().decode([HistoryRow].self, from: data) { history = rows; if UserDefaults.standard.integer(forKey:"historyVersion") < 2 { var tb=mach_timebase_info_data_t();mach_timebase_info(&tb);for i in history.indices { history[i].cpu *= Double(tb.numer)/Double(tb.denom) };UserDefaults.standard.set(2,forKey:"historyVersion") } }
+        if let data = try? Data(contentsOf: historyURL), let rows = try? JSONDecoder().decode([HistoryRow].self, from: data) { history = rows; if UserDefaults.standard.integer(forKey:"historyVersion") < 2 { var tb=mach_timebase_info_data_t();mach_timebase_info(&tb);for i in history.indices { history[i].cpu *= Double(tb.numer)/Double(tb.denom) } } }
+        // Mark history as current even when no file existed yet; otherwise a fresh install's
+        // correctly recorded history would be rescaled by the timebase on the next launch.
+        UserDefaults.standard.set(2,forKey:"historyVersion")
         UserDefaults.standard.set(historySince, forKey: "historySince")
         page = Page(rawValue:UserDefaults.standard.string(forKey:"defaultPage") ?? "Processes") ?? .processes
         if page == .settings {page = .processes}
@@ -262,7 +265,8 @@ enum Page: String, CaseIterable, Identifiable {
     func serviceResult(_ result: (Int32, String)) { if result.0 != 0 { error = result.1.isEmpty ? "launchd denied the operation." : result.1 }; refreshServices() }
     func export() {
         let panel = NSSavePanel(); panel.nameFieldStringValue = "processes.csv"; if panel.runModal() != .OK { return }; guard let url = panel.url else { return }
-        func csv(_ s: String) -> String { "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }
+        // Neutralize spreadsheet formulas: process names and paths are chosen by other programs.
+        func csv(_ s: String) -> String { let safe = s.first.map { "=+-@\t\r".contains($0) } == true ? "'" + s : s; return "\"" + safe.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }
         let content = "Name,PID,User,CPU percent of total machine,Resident bytes,Threads,Read bytes per second,Write bytes per second,Path\n" + processes.map { "\(csv($0.name)),\($0.id),\(csv($0.user)),\($0.cpu),\($0.memory),\($0.threads),\($0.diskRead.map { String($0) } ?? ""),\($0.diskWrite.map { String($0) } ?? ""),\(csv($0.path))" }.joined(separator: "\n")
         do { try content.write(to: url, atomically: true, encoding: .utf8) } catch { self.error = error.localizedDescription }
     }

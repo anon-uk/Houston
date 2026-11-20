@@ -93,11 +93,15 @@ From this source folder:
 
 ```sh
 mkdir -p /tmp/taskmanager-tests
+xcrun clang -std=c11 Tests/CPUDeltaTests.c -o /tmp/taskmanager-tests/cpudelta
+/tmp/taskmanager-tests/cpudelta
 xcrun clang -O2 Tests/MetricsTests.c Native/Metrics.c -o /tmp/taskmanager-tests/metrics
 /tmp/taskmanager-tests/metrics
 xcrun swiftc -parse-as-library Sources/GraphGeometry.swift Tests/GraphTests.swift -o /tmp/taskmanager-tests/graphs
 /tmp/taskmanager-tests/graphs
 ```
+
+`./Scripts/test.sh` runs all of these. The CPU tick-delta test is portable C and also runs on Linux in CI; it covers 32-bit Mach counter wraparound.
 
 Metrics tests compare CPU time against getrusage, and validate PID, ownership,
 resident memory, threads, total CPU/kernel counters, and individual core

@@ -1,0 +1,15 @@
+name: Portable tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  portable-c:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: CPU tick delta tests
+        run: |
+          cc -std=c11 -Wall -Wextra -pedantic -Werror -O2 Tests/CPUDeltaTests.c -o cpudelta -lm
+          ./cpudelta
