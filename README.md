@@ -1,7 +1,7 @@
 # Houston
 
 A native SwiftUI/AppKit system monitor for Apple silicon, macOS 26 or later.
-Version 1.4. It follows the modern Windows Task Manager workflow and adapts
+Version 1.4.1. It follows the modern Windows Task Manager workflow and adapts
 Mission Center UI resources into native Mac views with Liquid Glass.
 
 ![Houston Performance view with logical CPU graphs and resource summaries](docs/images/houston-performance.jpg)
@@ -12,6 +12,14 @@ Mission Center UI resources into native Mac views with Liquid Glass.
 
 Open `Houston.dmg` and drag `Houston.app` to Applications. The DMG
 also contains the matching source archive and license notices. This build is ad-hoc signed, not Developer ID notarized.
+
+## What changed in 1.4.1
+
+- Users → Show processes now filters the Details page to that user.
+- Suspended processes show as Suspended instead of Running.
+- Ejecting the disk shown in Performance switches the view back to CPU instead of showing CPU readings as disk throughput.
+- Usage history is saved on quit even when the main window is closed.
+- Sampling continues while menus are open and while tables scroll.
 
 ## What changed in 1.4
 
