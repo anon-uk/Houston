@@ -110,14 +110,13 @@ struct SidebarGlass: ViewModifier {
     }
 }
 struct Proc: Identifiable {
-    var id: Int32; var parent: Int32; var uid: UInt32; var name: String; var path: String; var cpu: Double; var memory: Double; var threads: Int; var cpuTime: Double; var diskRead: Double?; var diskWrite: Double?; var start: UInt64; var app: Bool = false; var state: String = "Running"; var userName: String = ""
+    var id: Int32; var parent: Int32; var uid: UInt32; var name: String; var path: String; var cpu: Double; var memory: Double; var threads: Int; var cpuTime: Double; var diskRead: Double?; var diskWrite: Double?; var start: UInt64; var app: Bool = false; var state: String = "Running"; var userName: String = ""; var responsible: Int32 = 0
     var user: String {userName.isEmpty ? String(uid) : userName}
     var kind: String { app ? "App" : (uid == 0 ? "System process" : "Background process") }
     var disk: Double { (diskRead ?? 0) + (diskWrite ?? 0) }
 }
-struct ProcessIdentity:Equatable {
-    var id:Int32;var parent:Int32;var uid:UInt32;var name:String;var path:String;var app:Bool
-    init(_ p:Proc) {id=p.id;parent=p.parent;uid=p.uid;name=p.name;path=p.path;app=p.app}
+extension ProcessIdentity {
+    init(_ p:Proc) {self.init(id:p.id,parent:p.parent,uid:p.uid,name:p.name,path:p.path,app:p.app,responsible:p.responsible)}
 }
 @MainActor final class OwnershipCache {
     static let shared=OwnershipCache()
@@ -167,10 +166,13 @@ enum Page: String, CaseIterable, Identifiable {
     let historyURL: URL
     init() {
         historyURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("NativeTaskManager/history.json")
-        if let data = try? Data(contentsOf: historyURL), let rows = try? JSONDecoder().decode([HistoryRow].self, from: data) { history = rows; if UserDefaults.standard.integer(forKey:"historyVersion") < 2 { var tb=mach_timebase_info_data_t();mach_timebase_info(&tb);for i in history.indices { history[i].cpu *= Double(tb.numer)/Double(tb.denom) } } }
-        // Mark history as current even when no file existed yet; otherwise a fresh install's
-        // correctly recorded history would be rescaled by the timebase on the next launch.
-        UserDefaults.standard.set(2,forKey:"historyVersion")
+        if let data = try? Data(contentsOf: historyURL), let rows = try? JSONDecoder().decode([HistoryRow].self, from: data) {
+            // Versions before 3 may hold CPU time inflated by a repeated timebase conversion
+            // (Houston 1.4 fresh installs), indistinguishable from correct data: start over.
+            if UserDefaults.standard.integer(forKey:"historyVersion") >= 3 { history = rows }
+            else { historySince = Date(); try? FileManager.default.removeItem(at: historyURL) }
+        }
+        UserDefaults.standard.set(3,forKey:"historyVersion")
         UserDefaults.standard.set(historySince, forKey: "historySince")
         page = Page(rawValue:UserDefaults.standard.string(forKey:"defaultPage") ?? "Processes") ?? .processes
         if page == .settings {page = .processes}
@@ -206,7 +208,7 @@ enum Page: String, CaseIterable, Identifiable {
                 let key = path.isEmpty ? name : path; var h = histories[key] ?? HistoryRow(id: key, name: name)
                 h.cpu += cpu * elapsed; h.read += (rd ?? 0) * elapsed; h.write += (wr ?? 0) * elapsed; h.lastSeen = now; histories[key] = h
             }
-            return Proc(id: r.pid, parent: r.ppid, uid: UInt32(r.uid), name: name, path: path, cpu: cpu * 100 / cpuDivisor, memory: Double(r.resident), threads: Int(r.threads), cpuTime: Double(r.cpu_ns)/1e9, diskRead: rd, diskWrite: wr, start: r.started, app: app?.activationPolicy == .regular, state: app?.isTerminated == true ? "Exited" : "Running", userName:userNames[UInt32(r.uid)] ?? String(r.uid))
+            return Proc(id: r.pid, parent: r.ppid, uid: UInt32(r.uid), name: name, path: path, cpu: cpu * 100 / cpuDivisor, memory: Double(r.resident), threads: Int(r.threads), cpuTime: Double(r.cpu_ns)/1e9, diskRead: rd, diskWrite: wr, start: r.started, app: app?.activationPolicy == .regular, state: app?.isTerminated == true ? "Exited" : "Running", userName:userNames[UInt32(r.uid)] ?? String(r.uid),responsible:r.responsible)
         }
         if let old = previousSystem, lastTime != nil { netIn = Double(stats.net_in >= old.net_in ? stats.net_in-old.net_in : 0)/elapsed; netOut = Double(stats.net_out >= old.net_out ? stats.net_out-old.net_out : 0)/elapsed }
         diskRead = 0; diskWrite = 0;diskRates = [:]
@@ -502,50 +504,35 @@ struct MainView: View {
         Divider()
         ForEach(["End task", "Force quit", "Suspend", "Resume", "Efficiency mode"], id: \.self) { action in Button(action) { m.processAction(action, proc: p) }.disabled(!m.canControl(p)) }
     }
-    // Parent ancestry is authoritative; bundle paths also retain launchd-reparented helpers.
+    // Ownership rules live in ProcessGrouping.swift; cached until process topology changes.
     var appOwners: [Int32:Int32] {
         let identities=m.processes.map {ProcessIdentity($0)}
         let cache=OwnershipCache.shared
         if cache.identities == identities {return cache.owners}
-        let byID=Dictionary(uniqueKeysWithValues:m.processes.map {($0.id,$0)})
-        let roots=m.processes.filter { $0.app }
-        var result:[Int32:Int32]=[:]
-        for p in m.processes {
-            if p.app { result[p.id]=p.id;continue }
-            var cursor=p.parent;var seen:Set<Int32>=[]
-            while cursor>1,seen.insert(cursor).inserted,let ancestor=byID[cursor] {
-                if ancestor.app {result[p.id]=ancestor.id;break};cursor=ancestor.parent
-            }
-            if result[p.id] == nil,IconCache.shared.isSafariExtension(p.path) {
-                let safari=roots.filter {$0.uid == p.uid && NSRunningApplication(processIdentifier:$0.id)?.bundleIdentifier == "com.apple.Safari"}
-                if safari.count == 1 {result[p.id]=safari[0].id}
-            }
-            if result[p.id] == nil {
-                let matches=roots.filter { root in
-                    guard root.uid == p.uid,let range=root.path.range(of: ".app/") else {return false}
-                    return p.path.hasPrefix(String(root.path[..<range.upperBound])) || (p.path.contains("/XPCServices/") && (p.name.hasSuffix(" ("+root.name+")") || (p.path.contains("com.apple.WebKit") && p.name.hasPrefix(root.name+" "))))
-                }
-                if matches.count == 1 {result[p.id]=matches[0].id}
-            }
-        };cache.identities=identities;cache.owners=result;return result
+        let result=groupOwners(identities,isSafariApp:{NSRunningApplication(processIdentifier:$0)?.bundleIdentifier == "com.apple.Safari"},isSafariExtension:{IconCache.shared.isSafariExtension($0)})
+        cache.identities=identities;cache.owners=result;return result
     }
     func processRows(owners:[Int32:Int32]) -> [Proc] {
         var rows:[Proc]=[]
         let roots=m.processes.filter {$0.app}.sorted(using:sortOrder)
         let visibleIDs=Set(filtered.map(\.id))
+        var childrenByRoot:[Int32:[Proc]]=[:]
+        for p in m.processes { if let owner=owners[p.id],owner != p.id {childrenByRoot[owner,default:[]].append(p)} }
         var groups:[(Proc,[Proc])]=[]
         var appRows:[Proc]=[]
         for root in roots {
-            let children=m.processes.filter {owners[$0.id] == root.id && $0.id != root.id}.sorted(using:sortOrder)
+            let children=(childrenByRoot[root.id] ?? []).sorted(using:sortOrder)
             guard visibleIDs.contains(root.id) || children.contains(where:{visibleIDs.contains($0.id)}) else {continue}
             var aggregate=root
-            for child in children {aggregate.cpu += child.cpu;aggregate.memory += child.memory;aggregate.threads += child.threads;aggregate.diskRead=(aggregate.diskRead ?? 0)+(child.diskRead ?? 0);aggregate.diskWrite=(aggregate.diskWrite ?? 0)+(child.diskWrite ?? 0)}
+            // Disk stays unavailable ("—") only when no member reports it.
+            for child in children {aggregate.cpu += child.cpu;aggregate.memory += child.memory;aggregate.threads += child.threads;if let r=child.diskRead {aggregate.diskRead=(aggregate.diskRead ?? 0)+r};if let w=child.diskWrite {aggregate.diskWrite=(aggregate.diskWrite ?? 0)+w}}
             if !children.isEmpty {aggregate.name += " (\(children.count+1))"}
             groups.append((aggregate,children.filter {m.query.isEmpty || visibleIDs.contains($0.id)}))
         }
+        let visibleChildren=Dictionary(groups.map {($0.0.id,$0.1)},uniquingKeysWith:{a,_ in a})
         for aggregate in groups.map({$0.0}).sorted(using:sortOrder) {
             appRows.append(aggregate)
-            if expandedApps.contains(aggregate.id) || !m.query.isEmpty {appRows += groups.first(where:{$0.0.id == aggregate.id})!.1}
+            if expandedApps.contains(aggregate.id) || !m.query.isEmpty {appRows += visibleChildren[aggregate.id] ?? []}
         }
         let other=filtered.filter {owners[$0.id] == nil}
         if !m.group {return appRows+other}

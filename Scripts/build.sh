@@ -8,7 +8,7 @@ SDK="${HOUSTON_SPARKLE_DIR:-$ROOT/../../work/Sparkle}"
 HOUSTON_SPARKLE_DIR="$SDK" "$ROOT/Scripts/setup-sparkle.sh"
 mkdir -p "$BUILD" "$DEST/Contents/MacOS" "$DEST/Contents/Resources"
 xcrun clang -O2 -mmacosx-version-min=26.0 -c "$ROOT/Native/Metrics.c" -o "$BUILD/Metrics.o"
-xcrun swiftc -parse-as-library -O -swift-version 5 -target arm64-apple-macos26.0 -module-cache-path "$BUILD/cache" -import-objc-header "$ROOT/Native/Metrics.h" "$ROOT/Sources/TaskManager.swift" "$ROOT/Sources/GraphGeometry.swift" "$ROOT/Sources/MenuGadgetLayout.swift" "$ROOT/Sources/Updater.swift" -F "$SDK" -framework Sparkle -Xlinker -rpath -Xlinker @executable_path/../Frameworks "$BUILD/Metrics.o" -o "$DEST/Contents/MacOS/Houston" -framework SwiftUI -framework AppKit -framework Charts
+xcrun swiftc -parse-as-library -O -swift-version 5 -target arm64-apple-macos26.0 -module-cache-path "$BUILD/cache" -import-objc-header "$ROOT/Native/Metrics.h" "$ROOT/Sources/TaskManager.swift" "$ROOT/Sources/GraphGeometry.swift" "$ROOT/Sources/ProcessGrouping.swift" "$ROOT/Sources/MenuGadgetLayout.swift" "$ROOT/Sources/Updater.swift" -F "$SDK" -framework Sparkle -Xlinker -rpath -Xlinker @executable_path/../Frameworks "$BUILD/Metrics.o" -o "$DEST/Contents/MacOS/Houston" -framework SwiftUI -framework AppKit -framework Charts
 cp "$ROOT/Assets/TaskManager.icns" "$DEST/Contents/Resources/TaskManager.icns"
 mkdir -p "$DEST/Contents/Frameworks"
 ditto --norsrc "$SDK/Sparkle.framework" "$DEST/Contents/Frameworks/Sparkle.framework"
