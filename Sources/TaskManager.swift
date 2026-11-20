@@ -160,6 +160,7 @@ enum Page: String, CaseIterable, Identifiable {
     var previous: [Int32: TMProcess] = [:]; var previousSystem: TMSystem?; var previousHardware = HardwareReading(); var lastTime: Date?; var timer: Timer?; var busy = false; var ticks = 0
     var userNames:[UInt32:String]=[:]
     var statusGadgets: StatusGadgets?
+    var terminationObserver: AnyCancellable?
     var openMainWindow: (() -> Void)?
     var openSettingsWindow: (() -> Void)?
     var historySince = UserDefaults.standard.object(forKey: "historySince") as? Date ?? Date()
@@ -177,12 +178,16 @@ enum Page: String, CaseIterable, Identifiable {
         page = Page(rawValue:UserDefaults.standard.string(forKey:"defaultPage") ?? "Processes") ?? .processes
         if page == .settings {page = .processes}
         statusGadgets = StatusGadgets(monitor:self)
+        // Observed here, not in MainView: the window may be closed while monitoring continues.
+        terminationObserver = NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification).sink { [weak self] _ in self?.saveHistory() }
         restartTimer(); refresh(); refreshServices()
     }
     func restartTimer() {
         timer?.invalidate(); UserDefaults.standard.set(interval, forKey: "interval")
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in Task { @MainActor in guard let self, !self.paused else { return }; self.refresh() } }
-        timer?.tolerance = min(0.1, interval * 0.1)
+        let next = Timer(timeInterval: interval, repeats: true) { [weak self] _ in Task { @MainActor in guard let self, !self.paused else { return }; self.refresh() } }
+        next.tolerance = min(0.1, interval * 0.1)
+        // Common modes keep sampling while menus are open or tables and windows are being dragged.
+        RunLoop.main.add(next, forMode: .common); timer = next
     }
     func refresh() {
         guard !busy else { return }; busy = true
@@ -208,7 +213,7 @@ enum Page: String, CaseIterable, Identifiable {
                 let key = path.isEmpty ? name : path; var h = histories[key] ?? HistoryRow(id: key, name: name)
                 h.cpu += cpu * elapsed; h.read += (rd ?? 0) * elapsed; h.write += (wr ?? 0) * elapsed; h.lastSeen = now; histories[key] = h
             }
-            return Proc(id: r.pid, parent: r.ppid, uid: UInt32(r.uid), name: name, path: path, cpu: cpu * 100 / cpuDivisor, memory: Double(r.resident), threads: Int(r.threads), cpuTime: Double(r.cpu_ns)/1e9, diskRead: rd, diskWrite: wr, start: r.started, app: app?.activationPolicy == .regular, state: app?.isTerminated == true ? "Exited" : "Running", userName:userNames[UInt32(r.uid)] ?? String(r.uid),responsible:r.responsible)
+            return Proc(id: r.pid, parent: r.ppid, uid: UInt32(r.uid), name: name, path: path, cpu: cpu * 100 / cpuDivisor, memory: Double(r.resident), threads: Int(r.threads), cpuTime: Double(r.cpu_ns)/1e9, diskRead: rd, diskWrite: wr, start: r.started, app: app?.activationPolicy == .regular, state: r.stopped != 0 ? "Suspended" : app?.isTerminated == true ? "Exited" : "Running", userName:userNames[UInt32(r.uid)] ?? String(r.uid),responsible:r.responsible)
         }
         if let old = previousSystem, lastTime != nil { netIn = Double(stats.net_in >= old.net_in ? stats.net_in-old.net_in : 0)/elapsed; netOut = Double(stats.net_out >= old.net_out ? stats.net_out-old.net_out : 0)/elapsed }
         diskRead = 0; diskWrite = 0;diskRates = [:]
@@ -434,9 +439,9 @@ struct MainView: View {
         .onAppear {m.openMainWindow = {openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)};m.openSettingsWindow = {openSettings();NSApp.activate(ignoringOtherApps:true)}}
         .preferredColorScheme(appearance == "System" ? nil : appearance == "Dark" ? .dark : .light)
         .alert("Unable to complete action", isPresented: Binding(get: {m.error != nil}, set: { if !$0 { m.error = nil } })) { Button("OK") { m.error = nil } } message: { Text(m.error ?? "") }
-        .onReceive(NotificationCenter.default.publisher(for:NSApplication.willTerminateNotification)) { _ in m.saveHistory() }
         .sheet(item: $m.inspector) { proc in Inspector(proc: proc).environmentObject(m) }
-        .onChange(of: m.page) { _, _ in m.query = ""; userFilter = nil; if m.page == .services || m.page == .startup { m.refreshServices() } }
+        // Users → Show processes sets userFilter together with the page change; keep it on Details.
+        .onChange(of: m.page) { _, page in m.query = ""; if page != .details { userFilter = nil }; if m.page == .services || m.page == .startup { m.refreshServices() } }
     }
     var sidebar: some View {
         List(selection:Binding<Page?>(get:{m.page},set:{if let page=$0 {m.page=page}})) {
@@ -587,7 +592,7 @@ struct MainView: View {
     var isDisk:Bool { metric.hasPrefix("Disk") }
     func diskFor(_ title:String) -> DiskCounter? { guard title.hasPrefix("Disk "),let index=Int(title.dropFirst(5)) else {return nil};return m.hardware.disks[safe:index] }
     var selectedDisk:DiskCounter? { diskFor(metric) }
-    func metricReading(_ sample:Sample,_ title:String) -> Double { if let disk=diskFor(title) {let rate=sample.disks[disk.id] ?? DiskRate();return rate.read+rate.write};return sample[keyPath:metricKey(title)] }
+    func metricReading(_ sample:Sample,_ title:String) -> Double { if let disk=diskFor(title) {let rate=sample.disks[disk.id] ?? DiskRate();return rate.read+rate.write};if title.hasPrefix("Disk ") {return 0};return sample[keyPath:metricKey(title)] }
     var selectedDiskRate:DiskRate { selectedDisk.flatMap {m.diskRates[$0.id]} ?? DiskRate() }
     func metricKey(_ title: String) -> KeyPath<Sample, Double> { switch title { case "Memory": return \.memory; case "Disk": return \.disk; case "Network": return \.network; case "GPU": return \.gpu; default: return \.cpu } }
     func metricColor(_ title:String) -> Color {
@@ -638,6 +643,8 @@ struct MainView: View {
 
         }
     }
+        // An ejected disk leaves a stale "Disk N" selection; fall back rather than show another device or CPU data.
+        .onChange(of: availableMetrics) { _, metrics in if !metrics.contains(metric) { metric = "CPU" } }
     }
     @ViewBuilder func performancePlots(height:Double) -> some View {
         if metric == "CPU" && cpuGraphMode == "Logical processors" {
